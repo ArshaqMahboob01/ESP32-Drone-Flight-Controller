@@ -189,10 +189,10 @@ void setup() {
     
     // Setup hardware timer for flight loop
     Serial.println("[INIT] Configuring flight loop timer...");
-    flightTimer = timerBegin(0, 80, true);  // 80MHz / 80 = 1MHz (1us tick)
-    timerAttachInterrupt(flightTimer, &onFlightTimer, true);
-    timerAlarmWrite(flightTimer, LOOP_PERIOD_US, true);
-    timerAlarmEnable(flightTimer);
+    // ESP32 Arduino v3.x API
+    flightTimer = timerBegin(1000000);  // 1MHz timer (1us tick)
+    timerAttachInterrupt(flightTimer, &onFlightTimer);
+    timerAlarm(flightTimer, LOOP_PERIOD_US, true, 0);  // period, autoreload, unlimited
     
     Serial.println("\n[READY] Flight controller initialized!");
     Serial.printf("[INFO] Loop frequency: %d Hz\n", LOOP_FREQUENCY_HZ);

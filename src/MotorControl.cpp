@@ -11,20 +11,16 @@ void MotorControl::begin() {
     // ESP32 LEDC provides precise PWM output
     
     // Motor 0 - Front Left
-    ledcSetup(0, PWM_FREQUENCY, PWM_RESOLUTION);
-    ledcAttachPin(MOTOR_PIN_FL, 0);
+    ledcAttach(MOTOR_PIN_FL, PWM_FREQUENCY, PWM_RESOLUTION);
     
     // Motor 1 - Front Right
-    ledcSetup(1, PWM_FREQUENCY, PWM_RESOLUTION);
-    ledcAttachPin(MOTOR_PIN_FR, 1);
+    ledcAttach(MOTOR_PIN_FR, PWM_FREQUENCY, PWM_RESOLUTION);
     
     // Motor 2 - Back Left
-    ledcSetup(2, PWM_FREQUENCY, PWM_RESOLUTION);
-    ledcAttachPin(MOTOR_PIN_BL, 2);
+    ledcAttach(MOTOR_PIN_BL, PWM_FREQUENCY, PWM_RESOLUTION);
     
     // Motor 3 - Back Right
-    ledcSetup(3, PWM_FREQUENCY, PWM_RESOLUTION);
-    ledcAttachPin(MOTOR_PIN_BR, 3);
+    ledcAttach(MOTOR_PIN_BR, PWM_FREQUENCY, PWM_RESOLUTION);
     
     // Initialize all motors to minimum
     stop();
@@ -33,9 +29,13 @@ void MotorControl::begin() {
 void MotorControl::arm() {
     armed = true;
     // Send minimum throttle to arm ESCs
+    ledcWrite(MOTOR_PIN_FL, usToPWM(THROTTLE_IDLE));
+    ledcWrite(MOTOR_PIN_FR, usToPWM(THROTTLE_IDLE));
+    ledcWrite(MOTOR_PIN_BL, usToPWM(THROTTLE_IDLE));
+    ledcWrite(MOTOR_PIN_BR, usToPWM(THROTTLE_IDLE));
+    
     for (int i = 0; i < 4; i++) {
         motorValues[i] = THROTTLE_IDLE;
-        ledcWrite(i, usToPWM(motorValues[i]));
     }
 }
 
@@ -45,9 +45,13 @@ void MotorControl::disarm() {
 }
 
 void MotorControl::stop() {
+    ledcWrite(MOTOR_PIN_FL, usToPWM(PWM_MIN));
+    ledcWrite(MOTOR_PIN_FR, usToPWM(PWM_MIN));
+    ledcWrite(MOTOR_PIN_BL, usToPWM(PWM_MIN));
+    ledcWrite(MOTOR_PIN_BR, usToPWM(PWM_MIN));
+    
     for (int i = 0; i < 4; i++) {
         motorValues[i] = PWM_MIN;
-        ledcWrite(i, usToPWM(PWM_MIN));
     }
 }
 
@@ -57,8 +61,14 @@ void MotorControl::setMotor(uint8_t motor, uint16_t value) {
     value = constrain(value, PWM_MIN, PWM_MAX);
     motorValues[motor] = value;
     
+    uint8_t pin = 0;
+    if (motor == 0) pin = MOTOR_PIN_FL;
+    else if (motor == 1) pin = MOTOR_PIN_FR;
+    else if (motor == 2) pin = MOTOR_PIN_BL;
+    else if (motor == 3) pin = MOTOR_PIN_BR;
+    
     if (armed) {
-        ledcWrite(motor, usToPWM(value));
+        ledcWrite(pin, usToPWM(value));
     }
 }
 
@@ -110,8 +120,12 @@ void MotorControl::update(float throttle, float roll, float pitch, float yaw) {
     // Apply motor values
     for (int i = 0; i < 4; i++) {
         motorValues[i] = constrain((uint16_t)motors[i], THROTTLE_IDLE, THROTTLE_MAX);
-        ledcWrite(i, usToPWM(motorValues[i]));
     }
+    
+    ledcWrite(MOTOR_PIN_FL, usToPWM(motorValues[0]));
+    ledcWrite(MOTOR_PIN_FR, usToPWM(motorValues[1]));
+    ledcWrite(MOTOR_PIN_BL, usToPWM(motorValues[2]));
+    ledcWrite(MOTOR_PIN_BR, usToPWM(motorValues[3]));
 }
 
 uint16_t MotorControl::getMotor(uint8_t motor) const {
