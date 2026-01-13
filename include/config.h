@@ -24,10 +24,10 @@
 #define I2C_CLOCK   400000  // 400kHz fast mode
 
 // Motor PWM pins (adjust for your wiring)
-#define MOTOR_PIN_FL 32  // Front-Left
-#define MOTOR_PIN_FR 33  // Front-Right
-#define MOTOR_PIN_BL 25  // Back-Left
-#define MOTOR_PIN_BR 26  // Back-Right
+#define MOTOR_PIN_FL 25  // Front-Left
+#define MOTOR_PIN_FR 14  // Front-Right
+#define MOTOR_PIN_BL 26  // Back-Left
+#define MOTOR_PIN_BR 27  // Back-Right
 
 // ============================================================================
 // LOOP TIMING

@@ -5,6 +5,7 @@
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
+#include <ESPmDNS.h>
 #include "PIDController.h"
 
 class TuningWebServer {
@@ -17,6 +18,7 @@ public:
     
     // Set references to PID controllers for tuning
     void setPIDControllers(PIDController* roll, PIDController* pitch, PIDController* yaw);
+    void setSettingsManager(SettingsManager* settings) { _settings = settings; }
     
     // Update telemetry data (call from main loop at ~10-50Hz)
     void updateTelemetry(float roll, float pitch, float yaw,
@@ -37,6 +39,7 @@ private:
     PIDController* _rollPID;
     PIDController* _pitchPID;
     PIDController* _yawPID;
+    SettingsManager* _settings;
     
     bool _isAP;
     unsigned long _lastBroadcast;

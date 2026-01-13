@@ -21,6 +21,7 @@
 #include "PIDController.h"
 #include "MotorControl.h"
 #include "WebServer.h"
+#include "SettingsManager.h"
 
 // ============================================================================
 // GLOBAL OBJECTS
@@ -47,6 +48,9 @@ MotorControl motors;
 
 // Web server for tuning
 TuningWebServer webServer(80);
+
+// Persistence
+SettingsManager settings;
 
 // ============================================================================
 // FLIGHT CONTROL VARIABLES
@@ -173,6 +177,15 @@ void setup() {
     Serial.println("[INIT] Initializing motor outputs...");
     motors.begin();
     
+    // Initialize settings and load saved values
+    Serial.println("[INIT] Loading settings from flash...");
+    settings.begin();
+    settings.loadPID("roll", rollPID);
+    settings.loadPID("pitch", pitchPID);
+    settings.loadPID("yaw", yawPID);
+    settings.loadIMUCalibration(imu);
+    settings.loadMagCalibration(mag);
+    
     // Initialize web server
     Serial.println("[INIT] Starting web server...");
     if (USE_AP_MODE) {
@@ -181,6 +194,7 @@ void setup() {
         webServer.begin(WIFI_SSID, WIFI_PASS);
     }
     webServer.setPIDControllers(&rollPID, &pitchPID, &yawPID);
+    webServer.setSettingsManager(&settings); // Pass settings manager to web server
     
     // Configure PID output limits
     rollPID.setOutputLimits(-500, 500);
@@ -198,9 +212,17 @@ void setup() {
     Serial.printf("[INFO] Loop frequency: %d Hz\n", LOOP_FREQUENCY_HZ);
     Serial.printf("[INFO] Sensors: IMU=%s, MAG=%s, BARO=%s\n", 
                   "OK", magAvailable ? "OK" : "N/A", baroAvailable ? "OK" : "N/A");
-    Serial.printf("[INFO] Web interface: http://%s\n", webServer.getIP().c_str());
+    Serial.println("[INFO] Web interface available via:");
+    Serial.printf("  - http://%s\n", webServer.getIP().c_str());
+    Serial.println("  - http://drone.local");
+    if (USE_AP_MODE) {
+        Serial.printf("[IMPORTANT] Connect your device to WiFi: %s\n", AP_SSID);
+    }
     Serial.println("\n[SAFETY] Motors are DISARMED");
-    Serial.println("[INFO] Commands: arm, disarm, status, calibrate_mag, throttle <value>\n");
+    Serial.println("[INFO] Commands (or use numbers 1-6):");
+    Serial.println("  1: arm           2: disarm        3: status");
+    Serial.println("  4: calibrate_mag 5: calibrate_baro 6 <val>: throttle");
+    Serial.println("  7: calibrate_imu (ensure drone is still and level)\n");
 }
 
 // ============================================================================
@@ -319,7 +341,7 @@ void loop() {
         cmd.trim();
         cmd.toLowerCase();
         
-        if (cmd == "arm") {
+        if (cmd == "arm" || cmd == "1") {
             if (throttleSetpoint <= ARM_THROTTLE_MAX) {
                 armed = true;
                 motors.arm();
@@ -332,12 +354,12 @@ void loop() {
                 Serial.println("[ERROR] Lower throttle to arm!");
             }
         }
-        else if (cmd == "disarm") {
+        else if (cmd == "disarm" || cmd == "2") {
             armed = false;
             motors.disarm();
             Serial.println("[DISARM] Motors DISARMED");
         }
-        else if (cmd == "status") {
+        else if (cmd == "status" || cmd == "3") {
             Serial.println("\n--- STATUS ---");
             Serial.printf("Armed: %s\n", armed ? "YES" : "NO");
             Serial.printf("Roll: %.2f°, Pitch: %.2f°, Yaw: %.2f°\n", 
@@ -347,31 +369,42 @@ void loop() {
             }
             if (baroAvailable) {
                 Serial.printf("Altitude: %.2f m, Temp: %.1f°C, Press: %.0f Pa\n",
-                              currentAltitude, currentTemperature, currentPressure);
+                               currentAltitude, currentTemperature, currentPressure);
             }
             Serial.printf("Loop time: %lu us\n", loopDurationUs);
             Serial.printf("Throttle: %.0f\n", throttleSetpoint);
             Serial.println("--------------\n");
         }
-        else if (cmd == "calibrate_mag") {
+        else if (cmd == "calibrate_mag" || cmd == "4") {
             if (magAvailable) {
                 Serial.println("Starting magnetometer calibration...");
                 mag.calibrate(15000);  // 15 seconds
+                settings.saveMagCalibration(mag);
+                Serial.println("Magnetometer calibration saved!");
             } else {
                 Serial.println("[ERROR] Magnetometer not available");
             }
         }
-        else if (cmd == "calibrate_baro") {
+        else if (cmd == "calibrate_baro" || cmd == "5") {
             if (baroAvailable) {
                 baro.calibrateAltitude();
             } else {
                 Serial.println("[ERROR] Barometer not available");
             }
         }
-        else if (cmd.startsWith("throttle ")) {
-            throttleSetpoint = cmd.substring(9).toFloat();
-            throttleSetpoint = constrain(throttleSetpoint, THROTTLE_MIN, THROTTLE_MAX);
-            Serial.printf("Throttle set to: %.0f\n", throttleSetpoint);
+        else if (cmd == "calibrate_imu" || cmd == "7") {
+            Serial.println("Starting IMU calibration... DO NOT MOVE DRONE!");
+            imu.calibrate(2000);
+            settings.saveIMUCalibration(imu);
+            Serial.println("IMU calibration saved to flash!");
+        }
+        else if (cmd.startsWith("throttle ") || cmd.startsWith("6 ")) {
+            int spaceIdx = cmd.indexOf(' ');
+            if (spaceIdx != -1) {
+                throttleSetpoint = cmd.substring(spaceIdx + 1).toFloat();
+                throttleSetpoint = constrain(throttleSetpoint, THROTTLE_MIN, THROTTLE_MAX);
+                Serial.printf("Throttle set to: %.0f\n", throttleSetpoint);
+            }
         }
     }
     

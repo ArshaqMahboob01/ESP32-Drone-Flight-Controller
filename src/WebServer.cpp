@@ -2,7 +2,7 @@
 
 TuningWebServer::TuningWebServer(uint16_t port) 
     : _server(port), _ws("/ws"), _isAP(false), _lastBroadcast(0),
-      _rollPID(nullptr), _pitchPID(nullptr), _yawPID(nullptr),
+      _rollPID(nullptr), _pitchPID(nullptr), _yawPID(nullptr), _settings(nullptr),
       _roll(0), _pitch(0), _yaw(0), _rollRate(0), _pitchRate(0), _yawRate(0),
       _loopTimeUs(0), _armed(false), _altitude(0), _heading(0), _temperature(0) {}
 
@@ -23,8 +23,12 @@ void TuningWebServer::begin(const char* ssid, const char* password) {
         Serial.print("IP: ");
         Serial.println(WiFi.localIP());
         _isAP = false;
+        
+        if (MDNS.begin("drone")) {
+            Serial.println("MDNS responder started: http://drone.local");
+        }
     } else {
-        Serial.println("\nWiFi failed, starting AP mode...");
+        Serial.println("\nWiFi connection failed, starting AP mode fallback...");
         beginAP("DroneConfig");
     }
     
@@ -45,6 +49,11 @@ void TuningWebServer::beginAP(const char* ssid, const char* password) {
     Serial.println(ssid);
     Serial.print("IP: ");
     Serial.println(WiFi.softAPIP());
+    
+    if (MDNS.begin("drone")) {
+        Serial.println("MDNS responder started: http://drone.local");
+    }
+    
     _isAP = true;
     
     setupRoutes();
@@ -179,6 +188,16 @@ void TuningWebServer::setupRoutes() {
                 request->send(400, "application/json", "{\"error\":\"Invalid axis\"}");
             }
         });
+        
+    // Save PID values to flash
+    _server.on("/save", HTTP_POST, [this](AsyncWebServerRequest* request) {
+        if (_settings && _rollPID && _pitchPID && _yawPID) {
+            _settings->saveAll(*_rollPID, *_pitchPID, *_yawPID);
+            request->send(200, "application/json", "{\"status\":\"ok\"}");
+        } else {
+            request->send(500, "application/json", "{\"error\":\"SettingsManager not initialized\"}");
+        }
+    });
 }
 
 void TuningWebServer::handleWebSocketEvent(AsyncWebSocket* server, AsyncWebSocketClient* client,
@@ -266,8 +285,11 @@ String TuningWebServer::generateHTML() {
             font-size: 13px;
             cursor: pointer;
             margin-top: 10px;
+            transition: transform 0.1s;
         }
-        button:hover { opacity: 0.9; }
+        button:hover { opacity: 0.9; transform: scale(1.02); }
+        button:active { transform: scale(0.98); }
+        button.save { background: linear-gradient(135deg, #44ff88, #00aa44); margin-top: 20px; width: 100%; font-weight: bold; }
         
         .loop-time {
             position: fixed;
@@ -351,6 +373,8 @@ String TuningWebServer::generateHTML() {
             </div>
             <button onclick="updatePID('yaw')">Apply</button>
         </div>
+        
+        <button class="save" onclick="saveSettings()">💾 Save PID Settings to Flash</button>
     </div>
     
     <div class="loop-time">Loop: <span id="loopTime">0</span> µs</div>
@@ -385,6 +409,12 @@ String TuningWebServer::generateHTML() {
                 body: JSON.stringify({ axis, kp, ki, kd, imax })
             });
             if ((await r.json()).status === 'ok') alert(`${axis.toUpperCase()} PID updated!`);
+        }
+        
+        async function saveSettings() {
+            const r = await fetch('/save', { method: 'POST' });
+            if ((await r.json()).status === 'ok') alert('Settings saved to flash memory!');
+            else alert('Error saving settings');
         }
     </script>
 </body>
