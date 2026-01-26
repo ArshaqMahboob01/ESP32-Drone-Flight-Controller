@@ -6,6 +6,7 @@
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 #include <ESPmDNS.h>
+#include "SettingsManager.h"
 #include "PIDController.h"
 
 class TuningWebServer {

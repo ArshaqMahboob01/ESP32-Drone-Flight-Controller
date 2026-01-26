@@ -20,8 +20,8 @@
 #include "LowPassFilter.h"
 #include "PIDController.h"
 #include "MotorControl.h"
-#include "WebServer.h"
 #include "SettingsManager.h"
+#include "WebServer.h"
 
 // ============================================================================
 // GLOBAL OBJECTS
@@ -50,7 +50,7 @@ MotorControl motors;
 TuningWebServer webServer(80);
 
 // Persistence
-SettingsManager settings;
+SettingsManager droneSettings;
 
 // ============================================================================
 // FLIGHT CONTROL VARIABLES
@@ -179,12 +179,12 @@ void setup() {
     
     // Initialize settings and load saved values
     Serial.println("[INIT] Loading settings from flash...");
-    settings.begin();
-    settings.loadPID("roll", rollPID);
-    settings.loadPID("pitch", pitchPID);
-    settings.loadPID("yaw", yawPID);
-    settings.loadIMUCalibration(imu);
-    settings.loadMagCalibration(mag);
+    droneSettings.begin();
+    droneSettings.loadPID("roll", rollPID);
+    droneSettings.loadPID("pitch", pitchPID);
+    droneSettings.loadPID("yaw", yawPID);
+    droneSettings.loadIMUCalibration(imu);
+    droneSettings.loadMagCalibration(mag);
     
     // Initialize web server
     Serial.println("[INIT] Starting web server...");
@@ -194,7 +194,7 @@ void setup() {
         webServer.begin(WIFI_SSID, WIFI_PASS);
     }
     webServer.setPIDControllers(&rollPID, &pitchPID, &yawPID);
-    webServer.setSettingsManager(&settings); // Pass settings manager to web server
+    webServer.setSettingsManager(&droneSettings); // Pass settings manager to web server
     
     // Configure PID output limits
     rollPID.setOutputLimits(-500, 500);
@@ -379,7 +379,7 @@ void loop() {
             if (magAvailable) {
                 Serial.println("Starting magnetometer calibration...");
                 mag.calibrate(15000);  // 15 seconds
-                settings.saveMagCalibration(mag);
+                droneSettings.saveMagCalibration(mag);
                 Serial.println("Magnetometer calibration saved!");
             } else {
                 Serial.println("[ERROR] Magnetometer not available");
@@ -395,7 +395,7 @@ void loop() {
         else if (cmd == "calibrate_imu" || cmd == "7") {
             Serial.println("Starting IMU calibration... DO NOT MOVE DRONE!");
             imu.calibrate(2000);
-            settings.saveIMUCalibration(imu);
+            droneSettings.saveIMUCalibration(imu);
             Serial.println("IMU calibration saved to flash!");
         }
         else if (cmd.startsWith("throttle ") || cmd.startsWith("6 ")) {
